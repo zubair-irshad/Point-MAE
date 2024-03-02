@@ -4,7 +4,12 @@ import torch.nn.functional as F
 import timm
 from timm.models.layers import DropPath, trunc_normal_
 import numpy as np
-from .build import MODELS
+
+import sys
+sys.path.append('/home/zubairirshad/Point-MAE')
+from models.build import MODELS
+
+# from .build import MODELS
 from utils import misc
 from utils.checkpoint import get_missing_parameters_message, get_unexpected_parameters_message
 from utils.logger import *
@@ -160,8 +165,10 @@ class TransformerEncoder(nn.Module):
             for i in range(depth)])
 
     def forward(self, x, pos):
-        for _, block in enumerate(self.blocks):
+        
+        for i, block in enumerate(self.blocks):
             x = block(x + pos)
+            print("x after block", i, x.shape)
         return x
 
 
@@ -309,6 +316,8 @@ class MaskTransformer(nn.Module):
 
         group_input_tokens = self.encoder(neighborhood)  #  B G C
 
+        print("group_input_tokens.shape", group_input_tokens.shape)
+
         batch_size, seq_len, C = group_input_tokens.size()
 
         x_vis = group_input_tokens[~bool_masked_pos].reshape(batch_size, -1, C)
@@ -318,13 +327,15 @@ class MaskTransformer(nn.Module):
         pos = self.pos_embed(masked_center)
 
         # transformer
+        print("x_vis.shape", x_vis.shape)
+        print("pos.shape", pos.shape)
         x_vis = self.blocks(x_vis, pos)
         x_vis = self.norm(x_vis)
 
         return x_vis, bool_masked_pos
 
 
-@MODELS.register_module()
+# @MODELS.register_module()
 class Point_MAE(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -381,7 +392,11 @@ class Point_MAE(nn.Module):
     def forward(self, pts, vis = False, **kwargs):
         neighborhood, center = self.group_divider(pts)
 
+        print("neighborhood.shape", neighborhood.shape)
+        print("center.shape", center.shape)
+
         x_vis, mask = self.MAE_encoder(neighborhood, center)
+        print("x_vis.shape", x_vis.shape)
         B,_,C = x_vis.shape # B VIS C
 
         pos_emd_vis = self.decoder_pos_embed(center[~mask]).reshape(B, -1, C)
@@ -417,7 +432,7 @@ class Point_MAE(nn.Module):
             return loss1
 
 # finetune model
-@MODELS.register_module()
+# @MODELS.register_module()
 class PointTransformer(nn.Module):
     def __init__(self, config, **kwargs):
         super().__init__()
@@ -546,3 +561,44 @@ class PointTransformer(nn.Module):
         concat_f = torch.cat([x[:, 0], x[:, 1:].max(1)[0]], dim=-1)
         ret = self.cls_head_finetune(concat_f)
         return ret
+    
+
+from utils import parser, dist_utils, misc
+from utils.logger import *
+from utils.config import *
+import time
+import os
+import torch
+
+if __name__ == "__main__":
+    #define model
+    args = parser.get_args()
+    # CUDA
+    args.use_gpu = torch.cuda.is_available()
+    if args.use_gpu:
+        torch.backends.cudnn.benchmark = True
+    # init distributed env first, since logger depends on the dist info.
+    if args.launcher == 'none':
+        args.distributed = False
+    else:
+        args.distributed = True
+        dist_utils.init_dist(args.launcher)
+        # re-set gpu_ids with distributed training mode
+        _, world_size = dist_utils.get_dist_info()
+        args.world_size = world_size
+    # logger
+    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+    log_file = os.path.join(args.experiment_path, f'{timestamp}.log')
+    logger = get_root_logger(log_file=log_file, name=args.log_name)
+    # define the tensorboard writer
+    # config
+    config = get_config(args, logger = logger)
+
+    print("hererrrrrrrrrrrrrrrrrr")
+    model = Point_MAE(config.model).cuda()
+
+    pts = torch.rand(2, 96000, 3).cuda()
+
+    ret1, ret2, full_center = model(pts, vis=True)
+
+

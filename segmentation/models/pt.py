@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import DropPath, trunc_normal_
-from logger import get_missing_parameters_message, get_unexpected_parameters_message
+# from logger import get_missing_parameters_message, get_unexpected_parameters_message
 
 from pointnet2_ops import pointnet2_utils
 from knn_cuda import KNN
@@ -34,6 +34,8 @@ class Group(nn.Module):
         '''
         batch_size, num_points, _ = xyz.shape
         # fps the centers out
+        if not xyz.is_contiguous():
+            xyz = xyz.contiguous()
         center = fps(xyz, self.num_group)  # B G 3
         # knn to get the neighborhood
         _, idx = self.knn(xyz, center)  # B G M
@@ -302,3 +304,16 @@ class get_loss(nn.Module):
     def forward(self, pred, target):
         total_loss = F.nll_loss(pred, target)
         return total_loss
+    
+
+if __name__ == "__main__":
+
+    model = get_model(16)
+    loss = get_loss()
+    input = torch.rand(2, 3, 2048)
+    target = torch.randint(0, 16, (2, 2048))
+    output = model(input, target)
+    print(output.shape)
+    loss_output = loss(output, target)
+    print(loss_output)
+
