@@ -97,7 +97,7 @@ def parse_args():
     parser.add_argument('--normal', action='store_true', default=False, help='use normals')
     # parser.add_argument('--step_size', type=int, default=20, help='decay step for lr decay')
     # parser.add_argument('--lr_decay', type=float, default=0.5, help='decay rate for lr decay')
-    parser.add_argument('--ckpts', type=str, default='../best/pretrain/m0.6R_1_pretrain300.pth', help='ckpts')
+    parser.add_argument('--ckpts', type=str, default=None, help='ckpts')
     parser.add_argument('--root', type=str, default='../data/shapenetcore_partanno_segmentation_benchmark_v0_normal/', help='data root')
     return parser.parse_args()
 
