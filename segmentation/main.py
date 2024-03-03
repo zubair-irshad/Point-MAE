@@ -325,9 +325,9 @@ def main(args):
             # points = points.data.numpy()
             # points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
             # points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
-            points = torch.Tensor(points).unsqueeze(0)
+            points = points.unsqueeze(0)
 
-            out_sem = torch.Tensor(out_sem).unsqueeze(0)
+            out_sem = out_sem.unsqueeze(0)
 
 
             points, target = points.float().cuda(), out_sem.long().cuda()
@@ -405,9 +405,9 @@ def main(args):
 
                 # cur_batch_size, NUM_POINT = points.size()
 
-                points = torch.Tensor(points).unsqueeze(0)
+                points = points.unsqueeze(0)
 
-                out_sem = torch.Tensor(out_sem).long().unsqueeze(0)
+                out_sem = out_sem.unsqueeze(0)
 
 
                 points, target = points.float().cuda(), out_sem.long().cuda()
