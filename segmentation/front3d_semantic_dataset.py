@@ -304,17 +304,33 @@ class Front3DSemanticDataset(BaseDataset):
 
 if __name__ == '__main__':
 
-    dataset_split = '/home/zubairirshad/Downloads/front3d_rpn_data/front3d_split.npz'
+    # dataset_split = '/home/zubairirshad/Downloads/front3d_rpn_data/front3d_split.npz'
+    # with np.load(dataset_split) as split:
+    #     train_scenes = split["train_scenes"]
+    #     test_scenes = split["test_scenes"]
+    #     val_scenes = split["val_scenes"]
+
+    # features_path = '/home/zubairirshad/Downloads/front3d_rpn_data/features'
+    # sem_feat_path = '/home/zubairirshad/Downloads/front3d_rpn_data/voxel_front3d'
+    # dataset = Front3DSemanticDataset(
+    #     features_path=features_path,
+    #     sem_feat_path=sem_feat_path,
+    #     scene_list=train_scenes,
+    #     preload=False,
+    #     percent_train=1.0,
+    # )
+
+    dataset_split = '/wild6d_data/zubair/MAE_complete_data/front3d_split.npz'
     with np.load(dataset_split) as split:
         train_scenes = split["train_scenes"]
         test_scenes = split["test_scenes"]
         val_scenes = split["val_scenes"]
 
-    features_path = '/home/zubairirshad/Downloads/front3d_rpn_data/features'
-    sem_feat_path = '/home/zubairirshad/Downloads/front3d_rpn_data/voxel_front3d'
+    features_path = '/wild6d_data/zubair/MAE_complete_data/features'
+
     dataset = Front3DSemanticDataset(
         features_path=features_path,
-        sem_feat_path=sem_feat_path,
+        sem_feat_path=None,
         scene_list=train_scenes,
         preload=False,
         percent_train=1.0,
@@ -330,8 +346,15 @@ if __name__ == '__main__':
         collate_fn=dataset.collate_fn,
     )
 
-    for i, data in enumerate(trainDataLoader):
-        point, alpha, out_sem = data
+    for i, data in tqdm(enumerate(trainDataLoader)):
+        point, scenes = data
+
+        if point.shape[0] > 0:
+            print("point", point.shape)
+            print("scenes", scenes)
+            # break
+
+        
 
         # point = point[0]
         # alpha = alpha[0]
@@ -340,9 +363,9 @@ if __name__ == '__main__':
         # print("np.unique(out_sem)", np.unique(out_sem))
 
 
-        if torch.cuda.is_available():
-            point = torch.stack([item.cuda() for item in point])
-            out_sem = torch.stack([item.cuda() for item in out_sem])
+        # if torch.cuda.is_available():
+        #     point = torch.stack([item.cuda() for item in point])
+        #     out_sem = torch.stack([item.cuda() for item in out_sem])
             # alpha = [item.cuda() for item in alpha]
             # out_sem = [item.cuda() for item in out_sem]
             # grid = [item.cuda() for item in grid]
@@ -355,11 +378,11 @@ if __name__ == '__main__':
         # point = grid[mask, :]
         # out_sem = out_sem[mask]
 
-        print("point", point.shape)
-        print("out_sem", out_sem.shape)
-        break
+    #     print("point", point.shape)
+    #     print("out_sem", out_sem.shape)
+    #     break
 
-    print("len(dataset)", len(dataset))
+    # print("len(dataset)", len(dataset))
 
     # data = dataset[0]
 
