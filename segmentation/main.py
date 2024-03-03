@@ -242,7 +242,7 @@ def main(args):
     log_string("The number of test data is: %d" % len(TEST_DATASET))
 
     # num_classes = 16
-    num_part = 20
+    num_part = 19
 
     '''MODEL LOADING'''
     MODEL = importlib.import_module(args.model)
@@ -338,6 +338,10 @@ def main(args):
             # seg_pred = classifier(points, to_categorical(label, num_classes))
 
             seg_pred = classifier(points)
+
+            print("seg_pred", seg_pred.shape, target.shape)
+
+            print("torch.unique(target)", torch.unique(target))
             seg_pred = seg_pred.contiguous().view(-1, num_part)
             target = target.view(-1, 1)[:, 0]
             pred_choice = seg_pred.data.max(1)[1]

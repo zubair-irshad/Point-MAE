@@ -344,7 +344,7 @@ if __name__ == '__main__':
 
         print("point", point.shape)
         print("out_sem", out_sem.shape)
-        break
+        # break
 
     # print("len(dataset)", len(dataset))
 
