@@ -392,7 +392,7 @@ def main(args):
         log_string('Train accuracy is: %.5f' % train_instance_acc)
         log_string('Train loss: %.5f' % loss1)
         log_string('lr: %.6f' % optimizer.param_groups[0]['lr'])
-        wandb.log({"train_acc": train_instance_acc, "train_loss": loss1, "lr": optimizer.param_groups[0]['lr']})
+        wandb.log({"train_acc": train_instance_acc, "lr": optimizer.param_groups[0]['lr']})
 
         with torch.no_grad():
             # test_metrics = {}
