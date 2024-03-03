@@ -269,8 +269,8 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
         for sample in batch:
             rgbsigma.append(sample[0])
             boxes.append(sample[1])
-            scenes.append(sample[2])
-        return rgbsigma, boxes, scenes
+            # scenes.append(sample[2])
+        return rgbsigma, boxes
     
 class Front3DSemanticDataset(BaseDataset):
     def __init__(
