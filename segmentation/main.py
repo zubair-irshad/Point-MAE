@@ -181,7 +181,7 @@ def main(args):
     else:
         exp_dir = exp_dir.joinpath(args.log_dir)
     exp_dir.mkdir(exist_ok=True)
-    checkpoints_dir = exp_dir.joinpath('checkpoints/')
+    checkpoints_dir = exp_dir.joinpath('checkpoints_pretrain_pointmae/')
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = exp_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
