@@ -17,14 +17,15 @@ def main():
     if args.use_gpu:
         torch.backends.cudnn.benchmark = True
     # init distributed env first, since logger depends on the dist info.
-    if args.launcher == 'none':
-        args.distributed = False
-    else:
-        args.distributed = True
-        dist_utils.init_dist(args.launcher)
-        # re-set gpu_ids with distributed training mode
-        _, world_size = dist_utils.get_dist_info()
-        args.world_size = world_size
+    # if args.launcher == 'none':
+    #     args.distributed = False
+    # else:
+
+    args.distributed = True
+    dist_utils.init_dist(args.launcher)
+    # re-set gpu_ids with distributed training mode
+    _, world_size = dist_utils.get_dist_info()
+    args.world_size = world_size
 
     print(f'world_size: {world_size}')
     # logger
