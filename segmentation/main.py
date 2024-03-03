@@ -136,12 +136,12 @@ def output_metrics(x, pred, num_classes=19):
     target = x
 
     # probabilities = F.softmax(pred, dim=1)
-    # print("pred", pred.shape, "target", target.shape)
+    print("pred", pred.shape, "target", target.shape)
 
     B, N, C = pred.shape
 
     target = target.view(-1, 1)
-    pred = pred.view(B*N, num_classes)
+    pred = pred.reshape(B*N, num_classes)
 
     predicted_labels = torch.argmax(pred, dim=1)
 
