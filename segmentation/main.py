@@ -104,7 +104,7 @@ def parse_args():
 def intersectionAndUnionGPU(output, target, K):
     # 'K' classes, output and target sizes are N or N * L or N * H * W, each value in range 0 to K - 1.
     # assert output.dim() in [1, 2, 3]
-    assert output.shape == target.shape
+    # assert output.shape == target.shape
     output = output.view(-1)
     target = target.view(-1)
 
@@ -135,8 +135,10 @@ def output_metrics(x, pred, num_classes=19):
 
     target = x
 
-    probabilities = F.softmax(pred, dim=1)
-    predicted_labels = torch.argmax(probabilities, dim=1)
+    # probabilities = F.softmax(pred, dim=1)
+    predicted_labels = torch.argmax(pred, dim=1)
+
+    print("target", target.shape, "predicted_labels", predicted_labels.shape)
 
     intersection, union, target = intersectionAndUnionGPU(
         predicted_labels, target, num_classes
@@ -322,7 +324,7 @@ def main(args):
             # points = grid[mask, :]
             # out_sem = out_sem[mask]
 
-            print("points", points.shape, out_sem.shape)
+            # print("points", points.shape, out_sem.shape)
 
             # num_iter += 1
             # points = points.data.numpy()
@@ -336,15 +338,15 @@ def main(args):
             points, target = points.float().cuda(), out_sem.long().cuda()
             points = points.transpose(2, 1)
 
-            print("points", points.shape, target.shape)
+            # print("points", points.shape, target.shape)
 
             # seg_pred = classifier(points, to_categorical(label, num_classes))
 
             seg_pred = classifier(points)
 
-            print("seg_pred", seg_pred.shape, target.shape)
+            # print("seg_pred", seg_pred.shape, target.shape)
 
-            print("torch.unique(target)", torch.unique(target))
+            # print("torch.unique(target)", torch.unique(target))
             seg_pred = seg_pred.contiguous().view(-1, num_part)
             target = target.view(-1, 1)[:, 0]
             pred_choice = seg_pred.data.max(1)[1]
