@@ -346,11 +346,11 @@ if __name__ == '__main__':
         collate_fn=dataset.collate_fn,
     )
 
-    for i, data in tqdm(enumerate(trainDataLoader)):
+    for i, data in enumerate(tqdm(trainDataLoader)):
         point, scenes = data
 
         point = point[0]
-        if point.shape[0] > 0:
+        if point.shape[0] == 0:
             print("point", point.shape)
             print("scenes", scenes)
             # break
