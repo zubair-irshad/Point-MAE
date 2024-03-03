@@ -335,7 +335,7 @@ class MaskTransformer(nn.Module):
         return x_vis, bool_masked_pos
 
 
-# @MODELS.register_module()
+@MODELS.register_module()
 class Point_MAE(nn.Module):
     def __init__(self, config):
         super().__init__()
