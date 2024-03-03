@@ -8,7 +8,7 @@ from pointnet2_ops import pointnet2_utils
 from knn_cuda import KNN
 from pointnet2_utils import PointNetFeaturePropagation
 
-from utils.checkpoint import get_missing_parameters_message, get_unexpected_parameters_message
+from logger import get_missing_parameters_message, get_unexpected_parameters_message
 
 def fps(data, number):
     '''
