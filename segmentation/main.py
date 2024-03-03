@@ -582,7 +582,9 @@ def test(args):
     print('# generator parameters:', sum(param.numel() for param in classifier.parameters()))
 
     if args.ckpts is not None:
-        classifier.load_model_from_ckpt(args.ckpts)
+        state = torch.load(args.ckpts)
+        classifier.load_state_dict(state['model_state_dict'])
+        # classifier.load_model_from_ckpt(args.ckpts)
         
     with torch.no_grad():
         classifier = classifier.eval()
@@ -632,22 +634,8 @@ def test(args):
 
     # wandb.log({"mIoU": mIoU, "mAcc": mAcc, "allAcc": allAcc})
 
-    log_string('Epoch %d test all Accuracy: %f mIOU: %f mAcc: %f' % (
-        epoch + 1, allAcc, mIoU, mAcc))
+    log_string('all Accuracy: %f mIOU: %f mAcc: %f' % (allAcc, mIoU, mAcc))
 
-
-    state = {
-        'epoch': epoch,
-        'train_acc': train_instance_acc,
-        'model_state_dict': classifier.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-    }
-
-    if mIoU >= best_class_avg_iou:
-        best_class_avg_iou = mIoU
-        savepath = str(checkpoints_dir) + '/best_class_avg_iou_model.pth'
-        torch.save(state, savepath)
-        log_string('Saving model....')
 
 if __name__ == '__main__':
     args = parse_args()
