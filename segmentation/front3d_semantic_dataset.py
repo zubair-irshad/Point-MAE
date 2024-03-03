@@ -33,7 +33,7 @@ def get_color_map():
         [128, 0, 192],  # 13
         [128, 128, 64],  # 14
         [128, 128, 192],  # 15
-        [0, 64, 0],  # 16
+        [0, 64, 0],  # 16x
         [0, 64, 128],  # 17
         [0, 192, 0],  # 18
         [0, 192, 128],  # 19
@@ -164,14 +164,16 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
 
         # rgbsigma = rgbsigma[:,:3][mask, :]
 
-        out_sem = out_sem[mask]
+        if self.sem_feat_path is not None:
+            out_sem = out_sem[mask]
 
         #Now subsample point cloud to keep 20k points
 
         if point.shape[0] > 50000:
             idx = np.random.choice(point.shape[0], 50000, replace=False)
             point = point[idx, :]
-            out_sem = out_sem[idx]
+            if self.sem_feat_path is not None:
+                out_sem = out_sem[idx]
 
         # if rgbsigma.dtype == torch.uint8:
         #     # normalize rgbsigma to [0, 1]
