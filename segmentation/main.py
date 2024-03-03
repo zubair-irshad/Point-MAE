@@ -137,7 +137,13 @@ def output_metrics(x, pred, num_classes=19):
 
     # probabilities = F.softmax(pred, dim=1)
     print("pred", pred.shape, "target", target.shape)
+
+    target = target.view(-1, 1)
+    pred = pred.view(-1, num_classes)
+
     predicted_labels = torch.argmax(pred, dim=1)
+
+
 
     print("target", target.shape, "predicted_labels", predicted_labels.shape)
 
@@ -223,7 +229,7 @@ def main(args):
 
     trainDataLoader =  torch.utils.data.DataLoader(
         TRAIN_DATASET,
-        batch_size=1,
+        batch_size=4,
         shuffle=False,
         num_workers=4,
         collate_fn=TRAIN_DATASET.collate_fn,
@@ -235,7 +241,7 @@ def main(args):
 
     testDataLoader =  torch.utils.data.DataLoader(
         TEST_DATASET,
-        batch_size=1,
+        batch_size=2,
         shuffle=False,
         num_workers=4,
         collate_fn=TEST_DATASET.collate_fn,
