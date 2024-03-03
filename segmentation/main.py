@@ -268,6 +268,7 @@ def main(args):
     start_epoch = 0
 
     if args.ckpts is not None:
+        print("loading from pretrained checkpoint pointmae", args.ckpts)
         classifier.load_model_from_ckpt(args.ckpts)
 
 ## we use adamw and cosine scheduler
