@@ -19,6 +19,8 @@ from tqdm import tqdm
 from dataset import PartNormalDataset
 import torch.nn.functional as F
 from front3d_semantic_dataset import Front3DSemanticDataset
+import wandb
+wandb.init(project="pointmae")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
@@ -220,7 +222,7 @@ def main(args):
     TEST_DATASET = Front3DSemanticDataset(
         features_path=features_path,
         sem_feat_path=sem_feat_path,
-        scene_list=test_scenes,
+        scene_list=val_scenes,
         preload=False,
         percent_train=1.0,
     )
@@ -367,6 +369,7 @@ def main(args):
             seg_pred = seg_pred[mask, :]
             target = target[mask]
             loss = criterion(seg_pred, target)
+            wandb.log({"loss": loss})
             loss.backward()
             optimizer.step()
             loss_batch.append(loss.detach().cpu())
@@ -389,6 +392,7 @@ def main(args):
         log_string('Train accuracy is: %.5f' % train_instance_acc)
         log_string('Train loss: %.5f' % loss1)
         log_string('lr: %.6f' % optimizer.param_groups[0]['lr'])
+        wandb.log({"train_acc": train_instance_acc, "train_loss": loss1, "lr": optimizer.param_groups[0]['lr']})
 
         with torch.no_grad():
             # test_metrics = {}
@@ -464,7 +468,9 @@ def main(args):
         mIoU = np.mean(iou_class)
         mAcc = np.mean(accuracy_class)
 
-        log_string('Epoch %d test Accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
+        wandb.log({"mIoU": mIoU, "mAcc": mAcc, "allAcc": allAcc})
+
+        log_string('Epoch %d test all Accuracy: %f mIOU: %f mAcc: %f' % (
             epoch + 1, allAcc, mIoU, mAcc))
 
 
@@ -474,9 +480,16 @@ def main(args):
             'model_state_dict': classifier.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
         }
-        savepath = str(checkpoints_dir) + '/best_model.pth'
-        torch.save(state, savepath)
-        log_string('Saving model....')
+
+        if mIoU >= best_class_avg_iou:
+            best_class_avg_iou = mIoU
+            savepath = str(checkpoints_dir) + '/best_class_avg_iou_model.pth'
+            torch.save(state, savepath)
+            log_string('Saving model....')
+
+        # savepath = str(checkpoints_dir) + '/best_model.pth'
+        # torch.save(state, savepath)
+        # log_string('Saving model....')
         global_epoch += 1
 
 
