@@ -138,8 +138,6 @@ def run_net(args, config, train_writer=None, val_writer=None):
 
             points = torch.stack(data[0])
             points = points.cuda()
-
-            print(points.size())
             # print("points", points.shape)
 
             assert points.size(1) == npoints
