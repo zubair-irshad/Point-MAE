@@ -136,7 +136,7 @@ def run_net(args, config, train_writer=None, val_writer=None):
 
             # points = data[0].cuda()
 
-            points = torch.stack(points)
+            points = torch.stack(data)
             points = points.cuda()
 
             print(points.size())
