@@ -309,9 +309,9 @@ def main(args):
 
         for i, data in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
 
-            point, alpha, out_sem = data
+            points, alpha, out_sem = data
 
-            point = torch.stack(point)
+            points = torch.stack(points)
             out_sem = torch.stack(out_sem)
 
             # grid = grid[0]
@@ -403,10 +403,10 @@ def main(args):
 
             for batch_id, data in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
 
-                point, alpha, out_sem = data
+                points, alpha, out_sem = data
 
 
-                point = torch.stack(point)
+                points = torch.stack(points)
                 out_sem = torch.stack(out_sem)
                 # grid = grid[0]
                 # alpha = alpha[0]
