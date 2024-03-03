@@ -190,14 +190,14 @@ def main(args):
 
     # TRAIN_DATASET = PartNormalDataset(root=root, npoints=args.npoint, split='trainval', normal_channel=args.normal)
 
-    dataset_split = '/home/zubairirshad/Downloads/front3d_rpn_data/front3d_split.npz'
+    dataset_split = '/wild6d_data/zubair/nerf_rpn/front3d_rpn_data/front3d_split.npz'
     with np.load(dataset_split) as split:
         train_scenes = split["train_scenes"]
         test_scenes = split["test_scenes"]
         val_scenes = split["val_scenes"]
 
-    features_path = '/home/zubairirshad/Downloads/front3d_rpn_data/features'
-    sem_feat_path = '/home/zubairirshad/Downloads/front3d_rpn_data/voxel_front3d'
+    features_path = '/wild6d_data/zubair/nerf_rpn/front3d_rpn_data/features'
+    sem_feat_path = '/wild6d_data/zubair/nerf_rpn/front3d_rpn_data/voxel_front3d'
     TRAIN_DATASET = Front3DSemanticDataset(
         features_path=features_path,
         sem_feat_path=sem_feat_path,
