@@ -24,7 +24,7 @@ model : {
   NAME: Point_MAE,
   # group_size: 32,
   # num_group: 64,
-  num_groups: 625
+  num_groups: 625,
   group_size: 32,
   loss: cdl2,
   transformer_config: {
