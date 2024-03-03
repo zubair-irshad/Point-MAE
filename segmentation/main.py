@@ -138,8 +138,6 @@ def output_metrics(x, pred, num_classes=19):
     target = x
 
     # probabilities = F.softmax(pred, dim=1)
-    print("pred", pred.shape, "target", target.shape)
-
     B, N, C = pred.shape
 
     target = target.view(-1, 1)
@@ -322,7 +320,7 @@ def main(args):
 
         for i, data in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
 
-            points, alpha, out_sem = data
+            points, out_sem = data
 
             points = torch.stack(points)
             out_sem = torch.stack(out_sem)
@@ -418,7 +416,7 @@ def main(args):
 
             for batch_id, data in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
 
-                points, alpha, out_sem = data
+                points, out_sem = data
 
 
                 points = torch.stack(points)

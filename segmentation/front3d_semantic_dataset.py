@@ -168,8 +168,8 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
 
         #Now subsample point cloud to keep 20k points
 
-        if point.shape[0] > 20000:
-            idx = np.random.choice(point.shape[0], 20000, replace=False)
+        if point.shape[0] > 50000:
+            idx = np.random.choice(point.shape[0], 50000, replace=False)
             point = point[idx, :]
             out_sem = out_sem[idx]
 
@@ -198,9 +198,9 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
         # if self.out_feat_path is not None:
         #     return scene, rgbsigma, out_rgbsigma
         if self.sem_feat_path is not None:
-            return point, alpha, out_sem
+            return point, out_sem
         else:
-            return point, alpha
+            return point
 
     def load_scene_data(self, preload: bool = False, percent_train=1.0):
         """
