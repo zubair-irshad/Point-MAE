@@ -340,7 +340,7 @@ if __name__ == '__main__':
 
     trainDataLoader =  torch.utils.data.DataLoader(
         dataset,
-        batch_size=4,
+        batch_size=1,
         shuffle=False,
         num_workers=4,
         collate_fn=dataset.collate_fn,
@@ -349,6 +349,7 @@ if __name__ == '__main__':
     for i, data in tqdm(enumerate(trainDataLoader)):
         point, scenes = data
 
+        point = point[0]
         if point.shape[0] > 0:
             print("point", point.shape)
             print("scenes", scenes)
