@@ -16,7 +16,8 @@ from pointnet2_ops import pointnet2_utils
 
 import wandb
 
-if dist_utils.get_local_rank() == 0:
+rank, world_size = dist_utils.get_dist_info()
+if rank == 0:
     wandb.init(project="pointmae")
 
 
@@ -169,8 +170,8 @@ def run_net(args, config, train_writer=None, val_writer=None):
             # if train_writer is not None:
             #     train_writer.add_scalar('Loss/Batch/Loss', loss.item(), n_itr)
             #     train_writer.add_scalar('Loss/Batch/LR', optimizer.param_groups[0]['lr'], n_itr)
-
-            wandb.log({"Loss": loss.item(), "LR": optimizer.param_groups[0]['lr']})
+            if rank == 0:
+                wandb.log({"Loss": loss.item(), "LR": optimizer.param_groups[0]['lr']})
 
 
             batch_time.update(time.time() - batch_start_time)
@@ -190,7 +191,8 @@ def run_net(args, config, train_writer=None, val_writer=None):
         # if train_writer is not None:
         #     train_writer.add_scalar('Loss/Epoch/Loss_1', losses.avg(0), epoch)
 
-        wandb.log({"Loss_1": losses.avg(0)})
+        if rank == 0:
+            wandb.log({"Loss_1": losses.avg(0)})
         print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],
              optimizer.param_groups[0]['lr']), logger = logger)
@@ -209,10 +211,10 @@ def run_net(args, config, train_writer=None, val_writer=None):
                                     logger=logger)
         # if (config.max_epoch - epoch) < 10:
         #     builder.save_checkpoint(base_model, optimizer, epoch, metrics, best_metrics, f'ckpt-epoch-{epoch:03d}', args, logger = logger)
-    if train_writer is not None:
-        train_writer.close()
-    if val_writer is not None:
-        val_writer.close()
+    # if train_writer is not None:
+    #     train_writer.close()
+    # if val_writer is not None:
+    #     val_writer.close()
 
 def validate(base_model, extra_train_dataloader, test_dataloader, epoch, val_writer, args, config, logger = None):
     print_log(f"[VALIDATION] Start validating epoch {epoch}", logger = logger)
