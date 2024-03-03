@@ -244,12 +244,12 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
 
     def __getitem__(self, index: int) -> Tuple[Tensor, Tensor, Tensor]:
         if self.scene_data:
-            point, alpha, out_sem = self.scene_data[index]
+            point, out_sem = self.scene_data[index]
         else:
             scene = self.scene_list[index]
-            point, alpha, out_sem = self.load_single_scene(scene)
+            point, out_sem = self.load_single_scene(scene)
 
-        return point, alpha, out_sem
+        return point, out_sem
 
     def __len__(self) -> int:
         return len(self.scene_list)
