@@ -10,24 +10,67 @@ from models import build_model_from_cfg
 from utils.logger import *
 from utils.misc import *
 from timm.scheduler import CosineLRScheduler
+from tools.front3d_semantic_dataset import Front3DSemanticDataset
 
 def dataset_builder(args, config):
-    dataset = build_dataset_from_cfg(config._base_, config.others)
+    # dataset = build_dataset_from_cfg(config._base_, config.others)
+
+
+    dataset_split = '/wild6d_data/zubair/MAE_complete_data/front3d_split.npz'
+    with np.load(dataset_split) as split:
+        train_scenes = split["train_scenes"]
+        test_scenes = split["test_scenes"]
+        val_scenes = split["val_scenes"]
+
+    if config.others.subset == 'train':
+        scenes = train_scenes
+    elif config.others.subset == 'val':
+        scenes = val_scenes
+    elif config.others.subset == 'test':
+        scenes = test_scenes
+
+    features_path = '/wild6d_data/zubair/MAE_complete_data/features'
+    dataset = Front3DSemanticDataset(
+        features_path=features_path,
+        sem_feat_path=None,
+        scene_list=scenes,
+        preload=False,
+        percent_train=1.0,
+    )
+
     shuffle = config.others.subset == 'train'
     if args.distributed:
-        sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle = shuffle)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size = config.others.bs,
-                                            num_workers = int(args.num_workers),
-                                            drop_last = config.others.subset == 'train',
-                                            worker_init_fn = worker_init_fn,
-                                            sampler = sampler)
+
+        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle = shuffle)
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=config.others.bs,
+            collate_fn=dataset.collate_fn,
+            sampler=train_sampler,
+            num_workers=2,
+            pin_memory=True,
+        )
+        
+        # sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle = shuffle)
+        # dataloader = torch.utils.data.DataLoader(dataset, batch_size = config.others.bs,
+        #                                     num_workers = int(args.num_workers),
+        #                                     drop_last = config.others.subset == 'train',
+        #                                     worker_init_fn = worker_init_fn,
+        #                                     sampler = sampler)
     else:
         sampler = None
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=config.others.bs,
-                                                shuffle = shuffle, 
-                                                drop_last = config.others.subset == 'train',
-                                                num_workers = int(args.num_workers),
-                                                worker_init_fn=worker_init_fn)
+        dataloader =  torch.utils.data.DataLoader(
+            dataset,
+            batch_size=2,
+            shuffle=False,
+            num_workers=4,
+            collate_fn=dataset.collate_fn,
+        )
+        # dataloader = torch.utils.data.DataLoader(dataset, batch_size=config.others.bs,
+        #                                         shuffle = shuffle, 
+        #                                         drop_last = config.others.subset == 'train',
+        #                                         num_workers = int(args.num_workers),
+        #                                         worker_init_fn=worker_init_fn)
     return sampler, dataloader
 
 def model_builder(config):
