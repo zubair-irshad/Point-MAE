@@ -95,8 +95,8 @@ def get_args():
         args.exp_name = 'test_' + args.exp_name
     if args.mode is not None:
         args.exp_name = args.exp_name + '_' +args.mode
-    args.experiment_path = os.path.join('./experiments', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
-    args.tfboard_path = os.path.join('./experiments', Path(args.config).stem, Path(args.config).parent.stem,'TFBoard' ,args.exp_name)
+    args.experiment_path = os.path.join('./experiments_pretrain2', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
+    args.tfboard_path = os.path.join('./experiments_pretrain2', Path(args.config).stem, Path(args.config).parent.stem,'TFBoard' ,args.exp_name)
     args.log_name = Path(args.config).stem
     create_experiment_dir(args)
     return args
