@@ -168,7 +168,6 @@ class TransformerEncoder(nn.Module):
         
         for i, block in enumerate(self.blocks):
             x = block(x + pos)
-            print("x after block", i, x.shape)
         return x
 
 
@@ -316,8 +315,6 @@ class MaskTransformer(nn.Module):
 
         group_input_tokens = self.encoder(neighborhood)  #  B G C
 
-        print("group_input_tokens.shape", group_input_tokens.shape)
-
         batch_size, seq_len, C = group_input_tokens.size()
 
         x_vis = group_input_tokens[~bool_masked_pos].reshape(batch_size, -1, C)
@@ -327,8 +324,6 @@ class MaskTransformer(nn.Module):
         pos = self.pos_embed(masked_center)
 
         # transformer
-        print("x_vis.shape", x_vis.shape)
-        print("pos.shape", pos.shape)
         x_vis = self.blocks(x_vis, pos)
         x_vis = self.norm(x_vis)
 
@@ -392,11 +387,7 @@ class Point_MAE(nn.Module):
     def forward(self, pts, vis = False, **kwargs):
         neighborhood, center = self.group_divider(pts)
 
-        print("neighborhood.shape", neighborhood.shape)
-        print("center.shape", center.shape)
-
         x_vis, mask = self.MAE_encoder(neighborhood, center)
-        print("x_vis.shape", x_vis.shape)
         B,_,C = x_vis.shape # B VIS C
 
         pos_emd_vis = self.decoder_pos_embed(center[~mask]).reshape(B, -1, C)
