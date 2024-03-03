@@ -319,17 +319,21 @@ def main(args):
             points = grid[mask, :]
             out_sem = out_sem[mask]
 
+            print("points", points.shape, out_sem.shape)
+
             # num_iter += 1
             # points = points.data.numpy()
             # points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
             # points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
             points = torch.Tensor(points).unsqueeze(0)
 
-            out_sem = torch.Tensor(out_sem).long().unsqueeze(0)
+            out_sem = torch.Tensor(out_sem).unsqueeze(0)
 
 
             points, target = points.float().cuda(), out_sem.long().cuda()
             points = points.transpose(2, 1)
+
+            print("points", points.shape, target.shape)
 
             # seg_pred = classifier(points, to_categorical(label, num_classes))
 
