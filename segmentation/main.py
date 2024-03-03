@@ -309,15 +309,18 @@ def main(args):
 
         for i, data in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
 
-            grid, alpha, out_sem = data
+            point, alpha, out_sem = data
 
-            grid = grid[0]
-            alpha = alpha[0]
-            out_sem = out_sem[0]
+            point = torch.stack(point)
+            out_sem = torch.stack(out_sem)
 
-            mask = alpha > 0.01
-            points = grid[mask, :]
-            out_sem = out_sem[mask]
+            # grid = grid[0]
+            # alpha = alpha[0]
+            # out_sem = out_sem[0]
+
+            # mask = alpha > 0.01
+            # points = grid[mask, :]
+            # out_sem = out_sem[mask]
 
             print("points", points.shape, out_sem.shape)
 
@@ -325,9 +328,9 @@ def main(args):
             # points = points.data.numpy()
             # points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
             # points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
-            points = points.unsqueeze(0)
+            # points = points.unsqueeze(0)
 
-            out_sem = out_sem.unsqueeze(0)
+            # out_sem = out_sem.unsqueeze(0)
 
 
             points, target = points.float().cuda(), out_sem.long().cuda()
@@ -400,22 +403,25 @@ def main(args):
 
             for batch_id, data in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
 
-                grid, alpha, out_sem = data
+                point, alpha, out_sem = data
 
-                grid = grid[0]
-                alpha = alpha[0]
-                out_sem = out_sem[0]
 
-                mask = alpha > 0.01
-                points = grid[mask, :]
-                out_sem = out_sem[mask]
+                point = torch.stack(point)
+                out_sem = torch.stack(out_sem)
+                # grid = grid[0]
+                # alpha = alpha[0]
+                # out_sem = out_sem[0]
+
+                # mask = alpha > 0.01
+                # points = grid[mask, :]
+                # out_sem = out_sem[mask]
                 
 
-                # cur_batch_size, NUM_POINT = points.size()
+                # # cur_batch_size, NUM_POINT = points.size()
 
-                points = points.unsqueeze(0)
+                # points = points.unsqueeze(0)
 
-                out_sem = out_sem.unsqueeze(0)
+                # out_sem = out_sem.unsqueeze(0)
 
 
                 points, target = points.float().cuda(), out_sem.long().cuda()

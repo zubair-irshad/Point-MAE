@@ -155,16 +155,23 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
         
         rgbsigma = rgbsigma.reshape(-1, 4)
         alpha = rgbsigma[:, -1]
-        # mask = alpha > 0.01
+        mask = alpha > 0.01
         
         # res = res[[2, 0, 1]]
         grid = self.construct_grid(res)
 
-        # point = grid[mask, :]
+        point = grid[mask, :]
 
-        # # rgbsigma = rgbsigma[:,:3][mask, :]
+        # rgbsigma = rgbsigma[:,:3][mask, :]
 
-        # out_sem = out_sem[mask]
+        out_sem = out_sem[mask]
+
+        #Now subsample point cloud to keep 20k points
+
+        if point.shape[0] > 20000:
+            idx = np.random.choice(point.shape[0], 20000, replace=False)
+            point = point[idx, :]
+            out_sem = out_sem[idx]
 
         # if rgbsigma.dtype == torch.uint8:
         #     # normalize rgbsigma to [0, 1]
@@ -191,9 +198,9 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
         # if self.out_feat_path is not None:
         #     return scene, rgbsigma, out_rgbsigma
         if self.sem_feat_path is not None:
-            return grid, alpha, out_sem
+            return point, alpha, out_sem
         else:
-            return grid, alpha
+            return point, alpha
 
     def load_scene_data(self, preload: bool = False, percent_train=1.0):
         """
@@ -315,46 +322,48 @@ if __name__ == '__main__':
 
     trainDataLoader =  torch.utils.data.DataLoader(
         dataset,
-        batch_size=1,
+        batch_size=4,
         shuffle=False,
         num_workers=4,
         collate_fn=dataset.collate_fn,
     )
 
     for i, data in enumerate(trainDataLoader):
-        grid, alpha, out_sem = data
+        point, alpha, out_sem = data
 
-        grid = grid[0]
-        alpha = alpha[0]
-        out_sem = out_sem[0]
+        # point = point[0]
+        # alpha = alpha[0]
+        # out_sem = out_sem[0]
 
-        print("np.unique(out_sem)", np.unique(out_sem))
-
-
-        # if torch.cuda.is_available():
-        #     alpha = [item.cuda() for item in alpha]
-        #     out_sem = [item.cuda() for item in out_sem]
-        #     grid = [item.cuda() for item in grid]
+        # print("np.unique(out_sem)", np.unique(out_sem))
 
 
+        if torch.cuda.is_available():
+            point = torch.stack([item.cuda() for item in point])
+            out_sem = torch.stack([item.cuda() for item in out_sem])
+            # alpha = [item.cuda() for item in alpha]
+            # out_sem = [item.cuda() for item in out_sem]
+            # grid = [item.cuda() for item in grid]
 
-        mask = alpha > 0.01
-        point = grid[mask, :]
-        out_sem = out_sem[mask]
+        
+
+
+
+        # mask = alpha > 0.01
+        # point = grid[mask, :]
+        # out_sem = out_sem[mask]
 
         print("point", point.shape)
         print("out_sem", out_sem.shape)
-        # break
+        break
 
-    # print("len(dataset)", len(dataset))
+    print("len(dataset)", len(dataset))
 
     # data = dataset[0]
 
-    # point, rgbsigma, out_sem, scene = data
+    # point, alpha, out_sem = data
 
-    # print("scene", scene)
     # print("point", point.shape)
-    # print("rgbsigma", rgbsigma.shape)
     # print("out_sem", out_sem.shape)
 
     # #Now let's visualize the point cloud and color them according to the semantic labels
