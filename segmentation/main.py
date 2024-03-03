@@ -101,6 +101,7 @@ def parse_args():
     # parser.add_argument('--lr_decay', type=float, default=0.5, help='decay rate for lr decay')
     parser.add_argument('--ckpts', type=str, default=None, help='ckpts')
     parser.add_argument('--root', type=str, default='../data/shapenetcore_partanno_segmentation_benchmark_v0_normal/', help='data root')
+    parser.add_argument('--test', action='store_true', default=False, help='test')
     return parser.parse_args()
 
 def intersectionAndUnionGPU(output, target, K):
@@ -491,6 +492,169 @@ def main(args):
         global_epoch += 1
 
 
+def test(args):
+
+    def log_string(str):
+        logger.info(str)
+        print(str)
+
+    '''HYPER PARAMETER'''
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+
+    '''CREATE DIR'''
+    timestr = str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M'))
+    exp_dir = Path('./log/')
+    exp_dir.mkdir(exist_ok=True)
+    exp_dir = exp_dir.joinpath('part_seg')
+    exp_dir.mkdir(exist_ok=True)
+    if args.log_dir is None:
+        exp_dir = exp_dir.joinpath(timestr)
+    else:
+        exp_dir = exp_dir.joinpath(args.log_dir)
+    exp_dir.mkdir(exist_ok=True)
+    checkpoints_dir = exp_dir.joinpath('checkpoints/')
+    checkpoints_dir.mkdir(exist_ok=True)
+    log_dir = exp_dir.joinpath('logs/')
+    log_dir.mkdir(exist_ok=True)
+
+    '''LOG'''
+    args = parse_args()
+    logger = logging.getLogger("Model")
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler = logging.FileHandler('%s/%s.txt' % (log_dir, args.model))
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    log_string('PARAMETER ...')
+    log_string(args)
+
+    root = args.root
+
+    # TRAIN_DATASET = PartNormalDataset(root=root, npoints=args.npoint, split='trainval', normal_channel=args.normal)
+
+    dataset_split = '/wild6d_data/zubair/nerf_rpn/front3d_rpn_data/front3d_split.npz'
+    with np.load(dataset_split) as split:
+        train_scenes = split["train_scenes"]
+        test_scenes = split["test_scenes"]
+        val_scenes = split["val_scenes"]
+
+    features_path = '/wild6d_data/zubair/nerf_rpn/front3d_rpn_data/features'
+    sem_feat_path = '/wild6d_data/zubair/nerf_rpn/front3d_rpn_data/voxel_front3d'
+    TRAIN_DATASET = Front3DSemanticDataset(
+        features_path=features_path,
+        sem_feat_path=sem_feat_path,
+        scene_list=train_scenes,
+        preload=False,
+        percent_train=1.0,
+    )
+
+    TEST_DATASET = Front3DSemanticDataset(
+        features_path=features_path,
+        sem_feat_path=sem_feat_path,
+        scene_list=test_scenes,
+        preload=False,
+        percent_train=1.0,
+    )
+
+
+    testDataLoader =  torch.utils.data.DataLoader(
+        TEST_DATASET,
+        batch_size=2,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=TEST_DATASET.collate_fn,
+    )
+
+    log_string("The number of training data is: %d" % len(TRAIN_DATASET))
+    log_string("The number of test data is: %d" % len(TEST_DATASET))
+
+    # num_classes = 16
+    num_part = 19
+
+    '''MODEL LOADING'''
+    MODEL = importlib.import_module(args.model)
+    shutil.copy('models/%s.py' % args.model, str(exp_dir))
+    # shutil.copy('models/pointnet2_utils.py', str(exp_dir))
+
+    classifier = MODEL.get_model(num_part).cuda()
+    classifier.apply(inplace_relu)
+    print('# generator parameters:', sum(param.numel() for param in classifier.parameters()))
+
+    if args.ckpts is not None:
+        classifier.load_model_from_ckpt(args.ckpts)
+        
+    with torch.no_grad():
+        classifier = classifier.eval()
+
+        intersection_meter = AverageMeter()
+        union_meter = AverageMeter()
+        target_meter = AverageMeter()
+
+
+        for batch_id, data in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
+
+            points, out_sem = data
+
+
+            points = torch.stack(points)
+            out_sem = torch.stack(out_sem)
+
+
+            points, target = points.float().cuda(), out_sem.long().cuda()
+            points = points.transpose(2, 1)
+
+            outputs = output_metrics(target, classifier(points), num_classes=num_part)
+            
+
+            intersection = outputs["intersection"]
+            union = outputs["union"]
+            target = outputs["target"]
+            # iou_val = outputs["iou_val"]
+            intersection, union, target = (
+                intersection.cpu().numpy(),
+                union.cpu().numpy(),
+                target.cpu().numpy(),
+            )
+            intersection_meter.update(intersection), union_meter.update(
+                union
+            ), target_meter.update(target)
+
+            accuracy = sum(intersection_meter.val) / (sum(target_meter.val) + 1e-10)
+
+    iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
+    accuracy_class = intersection_meter.sum / (target_meter.sum + 1e-10)
+    allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
+
+    # print("iou_class", iou_class, "accuracy_class", accuracy_class)
+    mIoU = np.mean(iou_class)
+    mAcc = np.mean(accuracy_class)
+
+    # wandb.log({"mIoU": mIoU, "mAcc": mAcc, "allAcc": allAcc})
+
+    log_string('Epoch %d test all Accuracy: %f mIOU: %f mAcc: %f' % (
+        epoch + 1, allAcc, mIoU, mAcc))
+
+
+    state = {
+        'epoch': epoch,
+        'train_acc': train_instance_acc,
+        'model_state_dict': classifier.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }
+
+    if mIoU >= best_class_avg_iou:
+        best_class_avg_iou = mIoU
+        savepath = str(checkpoints_dir) + '/best_class_avg_iou_model.pth'
+        torch.save(state, savepath)
+        log_string('Saving model....')
+
 if __name__ == '__main__':
     args = parse_args()
-    main(args)
+    
+    if not args.test:
+        main(args)
+    else:
+        test(args)
+    # main(args)
+
