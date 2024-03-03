@@ -17,19 +17,56 @@ from timm.scheduler import CosineLRScheduler
 from pathlib import Path
 from tqdm import tqdm
 from dataset import PartNormalDataset
+import torch.nn.functional as F
+from front3d_semantic_dataset import Front3DSemanticDataset
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
-seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
-               'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37],
-               'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49],
-               'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
-seg_label_to_cat = {}  # {0:Airplane, 1:Airplane, ...49:Table}
-for cat in seg_classes.keys():
-    for label in seg_classes[cat]:
-        seg_label_to_cat[label] = cat
+# seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
+#                'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37],
+#                'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49],
+#                'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
+
+
+# seg_label_to_cat = {}  # {0:Airplane, 1:Airplane, ...49:Table}
+# for cat in seg_classes.keys():
+#     for label in seg_classes[cat]:
+#         seg_label_to_cat[label] = cat
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+def masked_cross_entropy(criterion, targets, logits_pred, mask, num_classes=19):
+    # Apply the mask to the targets and logits
+    targets_masked = targets * mask
+    targets_masked = targets_masked.squeeze(-1)
+    logits_pred_masked = logits_pred * mask
+
+    logits_pred_masked = logits_pred_masked.reshape(-1, num_classes)
+    targets_masked = targets_masked.reshape(-1)
+
+    # Compute cross-entropy loss with the masked targets and logits
+    loss = criterion(logits_pred_masked, targets_masked.long())
+
+    return loss
 
 
 def inplace_relu(m):
@@ -48,7 +85,7 @@ def to_categorical(y, num_classes):
 def parse_args():
     parser = argparse.ArgumentParser('Model')
     parser.add_argument('--model', type=str, default='pt', help='model name')
-    parser.add_argument('--batch_size', type=int, default=16, help='batch Size during training')
+    parser.add_argument('--batch_size', type=int, default=8, help='batch Size during training')
     parser.add_argument('--epoch', default=300, type=int, help='epoch to run')
     parser.add_argument('--warmup_epoch', default=10, type=int, help='warmup epoch')
     parser.add_argument('--learning_rate', default=0.0002, type=float, help='initial learning rate')
@@ -64,6 +101,54 @@ def parse_args():
     parser.add_argument('--root', type=str, default='../data/shapenetcore_partanno_segmentation_benchmark_v0_normal/', help='data root')
     return parser.parse_args()
 
+def intersectionAndUnionGPU(output, target, K):
+    # 'K' classes, output and target sizes are N or N * L or N * H * W, each value in range 0 to K - 1.
+    # assert output.dim() in [1, 2, 3]
+    assert output.shape == target.shape
+    output = output.view(-1)
+    target = target.view(-1)
+
+    # Ignore class 0 in both output and target
+    ignore_mask = target != 0
+    output = output[ignore_mask]
+    target = target[ignore_mask]
+
+    # Calculate the intersection and union areas for each class
+    intersection = output[output == target]
+    area_intersection = torch.histc(
+        intersection, bins=K - 1, min=1, max=K - 1
+    )  # Intersection (ignore class 0)
+    area_output = torch.histc(
+        output, bins=K - 1, min=1, max=K - 1
+    )  # Area of predicted regions (ignore class 0)
+    area_target = torch.histc(
+        target, bins=K - 1, min=1, max=K - 1
+    )  # Area of target regions (ignore class 0)
+
+    # Calculate the union area by adding the areas of output and target and subtracting the intersection
+    area_union = area_output + area_target - area_intersection
+
+    return area_intersection, area_union, area_target
+
+
+def output_metrics(x, pred, num_classes=19):
+
+    target = x
+
+    probabilities = F.softmax(pred, dim=1)
+    predicted_labels = torch.argmax(probabilities, dim=1)
+
+    intersection, union, target = intersectionAndUnionGPU(
+        predicted_labels, target, num_classes
+    )
+    metrics = {}
+    metrics["intersection"] = intersection
+    metrics["union"] = union
+    metrics["target"] = target
+    # metrics["iou_val"] = iou_val
+
+    return metrics
+    
 
 def main(args):
     def log_string(str):
@@ -103,15 +188,61 @@ def main(args):
 
     root = args.root
 
-    TRAIN_DATASET = PartNormalDataset(root=root, npoints=args.npoint, split='trainval', normal_channel=args.normal)
-    trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=args.batch_size, shuffle=True, num_workers=10, drop_last=True)
-    TEST_DATASET = PartNormalDataset(root=root, npoints=args.npoint, split='test', normal_channel=args.normal)
-    testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=args.batch_size, shuffle=False, num_workers=10)
+    # TRAIN_DATASET = PartNormalDataset(root=root, npoints=args.npoint, split='trainval', normal_channel=args.normal)
+
+    dataset_split = '/home/zubairirshad/Downloads/front3d_rpn_data/front3d_split.npz'
+    with np.load(dataset_split) as split:
+        train_scenes = split["train_scenes"]
+        test_scenes = split["test_scenes"]
+        val_scenes = split["val_scenes"]
+
+    features_path = '/home/zubairirshad/Downloads/front3d_rpn_data/features'
+    sem_feat_path = '/home/zubairirshad/Downloads/front3d_rpn_data/voxel_front3d'
+    TRAIN_DATASET = Front3DSemanticDataset(
+        features_path=features_path,
+        sem_feat_path=sem_feat_path,
+        scene_list=train_scenes,
+        preload=False,
+        percent_train=1.0,
+    )
+
+    TEST_DATASET = Front3DSemanticDataset(
+        features_path=features_path,
+        sem_feat_path=sem_feat_path,
+        scene_list=test_scenes,
+        preload=False,
+        percent_train=1.0,
+    )
+
+
+
+    # trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=args.batch_size, shuffle=True, num_workers=10, drop_last=True)
+
+    trainDataLoader =  torch.utils.data.DataLoader(
+        TRAIN_DATASET,
+        batch_size=1,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=TRAIN_DATASET.collate_fn,
+    )
+
+    # TEST_DATASET = PartNormalDataset(root=root, npoints=args.npoint, split='test', normal_channel=args.normal)
+
+    # testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=args.batch_size, shuffle=False, num_workers=10)
+
+    testDataLoader =  torch.utils.data.DataLoader(
+        TEST_DATASET,
+        batch_size=1,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=TEST_DATASET.collate_fn,
+    )
+
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
     log_string("The number of test data is: %d" % len(TEST_DATASET))
 
-    num_classes = 16
-    num_part = 50
+    # num_classes = 16
+    num_part = 19
 
     '''MODEL LOADING'''
     MODEL = importlib.import_module(args.model)
@@ -172,16 +303,37 @@ def main(args):
         loss_batch = []
         num_iter = 0
         '''learning one epoch'''
-        for i, (points, label, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
-            num_iter += 1
-            points = points.data.numpy()
-            points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
-            points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
-            points = torch.Tensor(points)
-            points, label, target = points.float().cuda(), label.long().cuda(), target.long().cuda()
+        # for i, (points, label, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
+
+        # for i, (points, label, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
+
+        for i, data in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
+
+            grid, alpha, out_sem = data
+
+            grid = grid[0]
+            alpha = alpha[0]
+            out_sem = out_sem[0]
+
+            mask = alpha > 0.01
+            points = grid[mask, :]
+            out_sem = out_sem[mask]
+
+            # num_iter += 1
+            # points = points.data.numpy()
+            # points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
+            # points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
+            points = torch.Tensor(points).unsqueeze(0)
+
+            out_sem = torch.Tensor(out_sem).long().unsqueeze(0)
+
+
+            points, target = points.float().cuda(), out_sem.long().cuda()
             points = points.transpose(2, 1)
 
-            seg_pred = classifier(points, to_categorical(label, num_classes))
+            # seg_pred = classifier(points, to_categorical(label, num_classes))
+
+            seg_pred = classifier(points)
             seg_pred = seg_pred.contiguous().view(-1, num_part)
             target = target.view(-1, 1)[:, 0]
             pred_choice = seg_pred.data.max(1)[1]
@@ -213,98 +365,89 @@ def main(args):
         log_string('lr: %.6f' % optimizer.param_groups[0]['lr'])
 
         with torch.no_grad():
-            test_metrics = {}
-            total_correct = 0
-            total_seen = 0
-            total_seen_class = [0 for _ in range(num_part)]
-            total_correct_class = [0 for _ in range(num_part)]
-            shape_ious = {cat: [] for cat in seg_classes.keys()}
-            seg_label_to_cat = {}  # {0:Airplane, 1:Airplane, ...49:Table}
+            # test_metrics = {}
+            # total_correct = 0
+            # total_seen = 0
+            # total_seen_class = [0 for _ in range(num_part)]
+            # total_correct_class = [0 for _ in range(num_part)]
+            # shape_ious = {cat: [] for cat in seg_classes.keys()}
+            # seg_label_to_cat = {}  # {0:Airplane, 1:Airplane, ...49:Table}
 
-            for cat in seg_classes.keys():
-                for label in seg_classes[cat]:
-                    seg_label_to_cat[label] = cat
+            # for cat in seg_classes.keys():
+            #     for label in seg_classes[cat]:
+            #         seg_label_to_cat[label] = cat
 
             classifier = classifier.eval()
 
-            for batch_id, (points, label, target) in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
-                cur_batch_size, NUM_POINT, _ = points.size()
-                points, label, target = points.float().cuda(), label.long().cuda(), target.long().cuda()
+            # for batch_id, (points, label, target) in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
+
+            intersection_meter = AverageMeter()
+            union_meter = AverageMeter()
+            target_meter = AverageMeter()
+
+
+            for batch_id, data in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
+
+                grid, alpha, out_sem = data
+
+                grid = grid[0]
+                alpha = alpha[0]
+                out_sem = out_sem[0]
+
+                mask = alpha > 0.01
+                points = grid[mask, :]
+                out_sem = out_sem[mask]
+                
+
+                # cur_batch_size, NUM_POINT = points.size()
+
+                points = torch.Tensor(points).unsqueeze(0)
+
+                out_sem = torch.Tensor(out_sem).long().unsqueeze(0)
+
+
+                points, target = points.float().cuda(), out_sem.long().cuda()
                 points = points.transpose(2, 1)
-                seg_pred = classifier(points, to_categorical(label, num_classes))
-                cur_pred_val = seg_pred.cpu().data.numpy()
-                cur_pred_val_logits = cur_pred_val
-                cur_pred_val = np.zeros((cur_batch_size, NUM_POINT)).astype(np.int32)
-                target = target.cpu().data.numpy()
 
-                for i in range(cur_batch_size):
-                    cat = seg_label_to_cat[target[i, 0]]
-                    logits = cur_pred_val_logits[i, :, :]
-                    cur_pred_val[i, :] = np.argmax(logits[:, seg_classes[cat]], 1) + seg_classes[cat][0]
+                outputs = output_metrics(target, classifier(points), num_classes=num_part)
+                
 
-                correct = np.sum(cur_pred_val == target)
-                total_correct += correct
-                total_seen += (cur_batch_size * NUM_POINT)
+                intersection = outputs["intersection"]
+                union = outputs["union"]
+                target = outputs["target"]
+                # iou_val = outputs["iou_val"]
+                intersection, union, target = (
+                    intersection.cpu().numpy(),
+                    union.cpu().numpy(),
+                    target.cpu().numpy(),
+                )
+                intersection_meter.update(intersection), union_meter.update(
+                    union
+                ), target_meter.update(target)
 
-                for l in range(num_part):
-                    total_seen_class[l] += np.sum(target == l)
-                    total_correct_class[l] += (np.sum((cur_pred_val == l) & (target == l)))
+                accuracy = sum(intersection_meter.val) / (sum(target_meter.val) + 1e-10)
 
-                for i in range(cur_batch_size):
-                    segp = cur_pred_val[i, :]
-                    segl = target[i, :]
-                    cat = seg_label_to_cat[segl[0]]
-                    part_ious = [0.0 for _ in range(len(seg_classes[cat]))]
-                    for l in seg_classes[cat]:
-                        if (np.sum(segl == l) == 0) and (
-                                np.sum(segp == l) == 0):  # part is not present, no prediction as well
-                            part_ious[l - seg_classes[cat][0]] = 1.0
-                        else:
-                            part_ious[l - seg_classes[cat][0]] = np.sum((segl == l) & (segp == l)) / float(
-                                np.sum((segl == l) | (segp == l)))
-                    shape_ious[cat].append(np.mean(part_ious))
+        iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
+        accuracy_class = intersection_meter.sum / (target_meter.sum + 1e-10)
+        allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
 
-            all_shape_ious = []
-            for cat in shape_ious.keys():
-                for iou in shape_ious[cat]:
-                    all_shape_ious.append(iou)
-                shape_ious[cat] = np.mean(shape_ious[cat])
-            mean_shape_ious = np.mean(list(shape_ious.values()))
-            test_metrics['accuracy'] = total_correct / float(total_seen)
-            test_metrics['class_avg_accuracy'] = np.mean(
-                np.array(total_correct_class) / np.array(total_seen_class, dtype=np.float))
-            for cat in sorted(shape_ious.keys()):
-                log_string('eval mIoU of %s %f' % (cat + ' ' * (14 - len(cat)), shape_ious[cat]))
-            test_metrics['class_avg_iou'] = mean_shape_ious
-            test_metrics['inctance_avg_iou'] = np.mean(all_shape_ious)
+        # print("iou_class", iou_class, "accuracy_class", accuracy_class)
+        mIoU = np.mean(iou_class)
+        mAcc = np.mean(accuracy_class)
 
         log_string('Epoch %d test Accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
-            epoch + 1, test_metrics['accuracy'], test_metrics['class_avg_iou'], test_metrics['inctance_avg_iou']))
-        if (test_metrics['inctance_avg_iou'] >= best_inctance_avg_iou):
-            logger.info('Save model...')
-            savepath = str(checkpoints_dir) + '/best_model.pth'
-            log_string('Saving at %s' % savepath)
-            state = {
-                'epoch': epoch,
-                'train_acc': train_instance_acc,
-                'test_acc': test_metrics['accuracy'],
-                'class_avg_iou': test_metrics['class_avg_iou'],
-                'inctance_avg_iou': test_metrics['inctance_avg_iou'],
-                'model_state_dict': classifier.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-            }
-            torch.save(state, savepath)
-            log_string('Saving model....')
+            epoch + 1, allAcc, mIoU, mAcc))
 
-        if test_metrics['accuracy'] > best_acc:
-            best_acc = test_metrics['accuracy']
-        if test_metrics['class_avg_iou'] > best_class_avg_iou:
-            best_class_avg_iou = test_metrics['class_avg_iou']
-        if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
-            best_inctance_avg_iou = test_metrics['inctance_avg_iou']
-        log_string('Best accuracy is: %.5f' % best_acc)
-        log_string('Best class avg mIOU is: %.5f' % best_class_avg_iou)
-        log_string('Best inctance avg mIOU is: %.5f' % best_inctance_avg_iou)
+
+        state = {
+            'epoch': epoch,
+            'train_acc': train_instance_acc,
+            'model_state_dict': classifier.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+        }
+        savepath = str(checkpoints_dir) + '/best_model.pth'
+        torch.save(state, savepath)
+        log_string('Saving model....')
         global_epoch += 1
 
 

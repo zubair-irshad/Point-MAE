@@ -219,7 +219,9 @@ class get_model(nn.Module):
         self.propagation_0 = PointNetFeaturePropagation(in_channel=1152 + 3,
                                                         mlp=[self.trans_dim * 4, 1024])
 
-        self.convs1 = nn.Conv1d(3392, 512, 1)
+        # self.convs1 = nn.Conv1d(3392, 512, 1)   
+
+        self.convs1 = nn.Conv1d(3328, 512, 1)
         self.dp1 = nn.Dropout(0.5)
         self.convs2 = nn.Conv1d(512, 256, 1)
         self.convs3 = nn.Conv1d(256, self.cls_dim, 1)
@@ -263,7 +265,7 @@ class get_model(nn.Module):
 
             print(f'[Transformer] Successful Loading the ckpt from {bert_ckpt_path}')
 
-    def forward(self, pts, cls_label):
+    def forward(self, pts):
         B, C, N = pts.shape
         pts = pts.transpose(-1, -2)  # B N 3
         # divide the point clo  ud in the same form. This is important
@@ -282,9 +284,10 @@ class get_model(nn.Module):
         x_avg = torch.mean(x,2)
         x_max_feature = x_max.view(B, -1).unsqueeze(-1).repeat(1, 1, N)
         x_avg_feature = x_avg.view(B, -1).unsqueeze(-1).repeat(1, 1, N)
-        cls_label_one_hot = cls_label.view(B, 16, 1)
-        cls_label_feature = self.label_conv(cls_label_one_hot).repeat(1, 1, N)
-        x_global_feature = torch.cat((x_max_feature, x_avg_feature, cls_label_feature), 1) #1152*2 + 64
+        # cls_label_one_hot = cls_label.view(B, 16, 1)
+        # cls_label_feature = self.label_conv(cls_label_one_hot).repeat(1, 1, N)
+        # x_global_feature = torch.cat((x_max_feature, x_avg_feature, cls_label_feature), 1) #1152*2 + 64
+        x_global_feature = torch.cat((x_max_feature, x_avg_feature), 1) #1152*2
 
         f_level_0 = self.propagation_0(pts.transpose(-1, -2), center.transpose(-1, -2), pts.transpose(-1, -2), x)
 
@@ -308,11 +311,22 @@ class get_loss(nn.Module):
 
 if __name__ == "__main__":
 
-    model = get_model(16)
+    def to_categorical(y, num_classes):
+        """ 1-hot encodes a tensor """
+        new_y = torch.eye(num_classes)[y.cpu().data.numpy(),]
+        if (y.is_cuda):
+            return new_y.cuda()
+        return new_y
+
+
+    model = get_model(16).cuda()
     loss = get_loss()
-    input = torch.rand(2, 3, 2048)
-    target = torch.randint(0, 16, (2, 2048))
-    output = model(input, target)
+    input = torch.rand(2, 3, 2048).cuda()
+    target = torch.randint(0, 16, (2, 2048)).cuda()
+
+    # target = to_categorical(target, num_classes=16)
+    # print("target shape", target.shape)
+    output = model(input)
     print(output.shape)
     loss_output = loss(output, target)
     print(loss_output)
