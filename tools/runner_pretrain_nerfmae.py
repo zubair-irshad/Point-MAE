@@ -140,7 +140,7 @@ def run_net(args, config, train_writer=None, val_writer=None):
             points = points.cuda()
 
             print(points.size())
-            print("points", points.shape)
+            # print("points", points.shape)
 
             assert points.size(1) == npoints
             points = train_transforms(points)
