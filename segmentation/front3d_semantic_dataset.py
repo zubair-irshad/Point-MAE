@@ -175,12 +175,12 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
             if self.sem_feat_path is not None:
                 out_sem = out_sem[idx]
         
-        elif point.shape[0] < 50000:
-            idx = np.random.choice(point.shape[0], 50000 - point.shape[0], replace=True)
-            # point = np.concatenate([point, point[idx, :]], 0)
-            point = torch.cat([point, point[idx, :]], 0)
-            if self.sem_feat_path is not None:
-                out_sem = np.concatenate([out_sem, out_sem[idx]], 0)
+        # elif point.shape[0] < 50000:
+        #     idx = np.random.choice(point.shape[0], 50000 - point.shape[0], replace=True)
+        #     # point = np.concatenate([point, point[idx, :]], 0)
+        #     point = torch.cat([point, point[idx, :]], 0)
+        #     if self.sem_feat_path is not None:
+        #         out_sem = np.concatenate([out_sem, out_sem[idx]], 0)
 
         
 
