@@ -177,9 +177,12 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
         
         elif point.shape[0] < 50000:
             idx = np.random.choice(point.shape[0], 50000 - point.shape[0], replace=True)
-            point = np.concatenate([point, point[idx, :]], 0)
+            # point = np.concatenate([point, point[idx, :]], 0)
+            point = torch.cat([point, point[idx, :]], 0)
             if self.sem_feat_path is not None:
                 out_sem = np.concatenate([out_sem, out_sem[idx]], 0)
+
+        
 
         # if rgbsigma.dtype == torch.uint8:
         #     # normalize rgbsigma to [0, 1]
