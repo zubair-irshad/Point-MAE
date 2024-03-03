@@ -327,7 +327,9 @@ if __name__ == '__main__':
         grid = grid[0]
         alpha = alpha[0]
         out_sem = out_sem[0]
-        
+
+        print("np.unique(out_sem)", np.unique(out_sem))
+
 
         # if torch.cuda.is_available():
         #     alpha = [item.cuda() for item in alpha]

@@ -242,7 +242,7 @@ def main(args):
     log_string("The number of test data is: %d" % len(TEST_DATASET))
 
     # num_classes = 16
-    num_part = 19
+    num_part = 20
 
     '''MODEL LOADING'''
     MODEL = importlib.import_module(args.model)
@@ -344,6 +344,10 @@ def main(args):
 
             correct = pred_choice.eq(target.data).cpu().sum()
             mean_correct.append(correct.item() / (args.batch_size * args.npoint))
+
+            mask = target > 0
+            seg_pred = seg_pred[mask, :]
+            target = target[mask]
             loss = criterion(seg_pred, target)
             loss.backward()
             optimizer.step()
