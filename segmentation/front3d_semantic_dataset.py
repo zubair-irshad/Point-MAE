@@ -353,6 +353,10 @@ if __name__ == '__main__':
         if point.shape[0] == 0:
             print("point", point.shape)
             print("scenes", scenes)
+
+        elif point.shape[0] < 50000:
+            print("point", point.shape)
+            print("scenes", scenes)
             # break
 
         
