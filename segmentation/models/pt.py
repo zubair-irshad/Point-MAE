@@ -277,11 +277,7 @@ class get_model(nn.Module):
         # divide the point clo  ud in the same form. This is important
         neighborhood, center = self.group_divider(pts)
 
-        print(neighborhood.shape, center.shape)
-
         group_input_tokens = self.encoder(neighborhood)  # B G N
-
-        print("group_input_tokens", group_input_tokens.shape)
 
         pos = self.pos_embed(center)
         # final input
