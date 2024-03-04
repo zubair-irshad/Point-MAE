@@ -90,7 +90,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=8, help='batch Size during training')
     parser.add_argument('--epoch', default=300, type=int, help='epoch to run')
     parser.add_argument('--warmup_epoch', default=10, type=int, help='warmup epoch')
-    parser.add_argument('--learning_rate', default=0.00009, type=float, help='initial learning rate')
+    parser.add_argument('--learning_rate', default=0.00006, type=float, help='initial learning rate')
     parser.add_argument('--gpu', type=str, default='0', help='specify GPU devices')
     # parser.add_argument('--optimizer', type=str, default='AdamW', help='Adam or SGD')
     parser.add_argument('--log_dir', type=str, default='./exp', help='log path')
