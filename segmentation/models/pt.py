@@ -189,8 +189,12 @@ class get_model(nn.Module):
         self.cls_dim = cls_dim
         self.num_heads = 6
 
-        self.group_size = 32
-        self.num_group = 128
+        # self.group_size = 32
+        # self.num_group = 128
+
+        self.group_size = 128
+        self.num_group = 750
+
         # grouper
         self.group_divider = Group(num_group=self.num_group, group_size=self.group_size)
         # define the encoder
@@ -273,7 +277,11 @@ class get_model(nn.Module):
         # divide the point clo  ud in the same form. This is important
         neighborhood, center = self.group_divider(pts)
 
+        print(neighborhood.shape, center.shape)
+
         group_input_tokens = self.encoder(neighborhood)  # B G N
+
+        print("group_input_tokens", group_input_tokens.shape)
 
         pos = self.pos_embed(center)
         # final input
@@ -323,8 +331,8 @@ if __name__ == "__main__":
 
     model = get_model(16).cuda()
     loss = get_loss()
-    input = torch.rand(2, 3, 2048).cuda()
-    target = torch.randint(0, 16, (2, 2048)).cuda()
+    input = torch.rand(2, 3, 50000).cuda()
+    target = torch.randint(0, 16, (2, 50000)).cuda()
 
     # target = to_categorical(target, num_classes=16)
     # print("target shape", target.shape)
